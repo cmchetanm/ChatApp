@@ -2,17 +2,15 @@
 
 # Users Authentication
 class UsersController < ApiController
-  before_action :authenticate_user, except: %i[login register]
+  before_action :authenticate_user, except: %i[login register check_status]
 
   # POST /register
   def register
     @user = User.new(user_params)
     if @user.save
-      token = jwt_encode(user_id: @user.id)
       render json: {
         message: 'User created successfully',
         user: UserSerializer.new(@user),
-        token: token
       }, status: :created
     else
       render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
@@ -23,6 +21,7 @@ class UsersController < ApiController
   def login
     @user = User.find_by(email: params[:email])
     if @user&.authenticate(params[:password])
+      @user.update(status: 'online')
       token = jwt_encode(user_id: @user.id)
       render json: {
         message: 'User logged in successfully',
@@ -40,6 +39,26 @@ class UsersController < ApiController
       return render json: { error: 'Password reset successfully' },
                     status: :ok
     end
+  end
+
+  # POST /logout
+  def logout
+    header = request.headers['Authorization']
+    header = header.split(' ').last if header
+    
+    BlacklistedToken.create(token: header, exp: Time.now)
+    current_user.update(status: 'offline')
+    
+    render json: {
+      message: 'User logged out successfully',
+    }, status: :ok
+  end
+
+  # GET /check_status
+  def check_status
+    user = User.find_by(id: params[:id])
+    return render json: { error: 'User not found' }, status: :not_found  unless user.present? 
+    render json: { msg: "The user status is: #{user.status}" }, status: :ok
   end
 
   private

@@ -9,4 +9,5 @@ class User < ApplicationRecord
   validates :email, presence: true, uniqueness: true
   validates :full_name, presence: true
   validates :password_digest, presence: true
+  # enum status: { offline: 0, online: 1 }
 end
